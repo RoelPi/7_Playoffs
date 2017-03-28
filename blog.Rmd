@@ -1,0 +1,87 @@
+---
+title: "Voetbalgeschiedenis: Zeven playoffs leren ons dat Gent waarschijnlijk geen kampioen zal worden"
+output: html_notebook
+---
+
+**De laatste speeldag in de Jupiler Pro League had heel wat om het lijf. Een miraculeuze degradatiestrijd en de laatste tickets voor de playoffs maakten er een geweldige laatste speeldag in de reguliere competitie van. De kaarten zijn echter geschut. Dus is het een uitgelezen kans om eens naar de kansen van de zes ploegen in de playoffs te kijken.**
+
+Het is **Anderlecht** die als leider de Playoffs ingaat. Op slechts een punt volgt **Club Brugge**. Op vier punten volgen de troepen van Francky Dury, **Zulte Waregem**. En op zes punten volgen zowel **AA Gent** als **KV Oostende** en **Charleroi**.
+
+|Team|Punten|
+|---|---|
+|**Anderlecht**|31|
+|**Club Brugge**|30|
+|**Zulte Waregem**|27|
+|**AA Gent**|25|
+|**KV Oostende**|25|
+|**Charleroi**|25|
+
+Hoe comfortabel is de voorsprong van **Anderlecht** tegenover de achtervolgers en wat zijn de kansen van de andere ploegen om de titel te grijpen? Op basis van de resultaten van de vorige 7 edities van de Playoffs zocht ik het uit.
+
+Over het algemeen kunnen we stellen dat het aantal posities dat teams stijgen of dalen tijdens de Playoffs vrij beperkt is. Van de 42 ploegen - 6 ploegen maal 7 playoffs - wisten er maar 3 te stijgen met 2 plaatsen. Slechts eenmaal was dat meer dan twee plaatsen. **Standard** startte in 2011 vanop de zesde plaats en eindigde na een waanzinnig goede reeks op een steenworp van de eindoverwinning.
+
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,cache=FALSE}
+library(data.table)
+library(ggplot2)
+library(MASS)
+source("getData.R")
+options(scipen=999)
+
+pal = "Dark2"
+options(scipen=999)
+
+ePlot <- ggplot(d,aes(x=-Pos_Diff)) + 
+    geom_histogram(stat="bin",binwidth=1,fill="#43a2ca",color="#0868ac") +
+    labs(x="Positieverschil",y="Aantal keer") +
+    scale_x_continuous(limits=c(-5,5),breaks=(-5:5)) +
+    scale_y_continuous(limits=c(0,17),breaks=0:17)
+print(ePlot)
+```
+
+Je hoeft dus geen raketgeleerde te zijn op in te zien dat de startpositie in de playoffs heel bepalend is voor de eindpositie. Als we een grafiek maken waarin we de start- en eindpositie in de playoffs tegenover elkaar afzetten dan zien we een stijgende lijn. Wie als zesde ploeg start heeft veel kans om als zesde te eindigen, wie als vijfde start heeft veel kans om als vijfde te eindigen, enz. Meer nog, een simpele lineaire regressie stelt dat de eindstand in de playoffs voor meer dan **56%** bepaald wordt door de startposities.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,cache=FALSE}
+g <- with(d,lm(Pos_Playoff~Pos_Regular))
+d$Pos_Regular <- jitter(d$Pos_Regular)
+d$Pos_Playoff <- jitter(d$Pos_Playoff)
+gPlot <- ggplot(d,aes(x=Pos_Regular,y=Pos_Playoff,label=paste0(Team,"-",Year))) + 
+    geom_point(size=2,alpha=0.7,fill="#43a2ca",col="#43a2ca") +
+    geom_smooth(method='lm') +
+    # geom_smooth(method='lm', formula=y~poly(x,3,raw=T)) +
+    geom_text(size=2,nudge_y=0.2,alpha=0.8) +
+    labs(x="Stand Reguliere Competitie",y="Stand Playoffs") +
+    scale_x_continuous(limits=c(0,7),breaks=(0:7)) +
+    scale_y_continuous(limits=c(0,7),breaks=0:7)
+print(gPlot)
+```
+
+Om leider **Anderlecht** bij te benen - los van het doelsaldo en afronding[^1] bij de start van de playoffs - moet **Club Brugge** 1 punt inhalen, Zulte-Waregem 4 punten en de anderen elk 6 punten. Laten we daar eerlijk over zijn, de kansen van de nummer vier tot zes zijn gering. Als we naar elke kloof uit de playoffs uit het verleden kijken[^2] dan krijgen we inzicht in hoe moeilijk het is om een kloof van 6 punten te dichten. Een bolletje onderaan betekent dat de kloof niet gedicht is, een bolletje bovenaan betekent dat het wel gelukt is. 
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,cache=FALSE}
+nPlot <- ggplot(f,aes(x=Start,y=Success)) + 
+    geom_jitter(size=2,height=0.1,width=0.1,alpha=0.4,fill="#43a2ca",col="#43a2ca") + 
+    stat_smooth(method='glm',method.args=list(family="binomial")) +
+    scale_x_continuous(limits=c(0,15),breaks=(0:15)) +
+    scale_y_continuous(limits=c(-0.2,1.2),breaks=c(0,0.2,0.4,0.6,0.8,1)) +
+    labs(x="Kloof","Kans")
+print(nPlot)
+```
+
+En dat valt best tegen. Slechts tweemaal in de geschiedenis van de playoffs werd een kloof van meer dan 5 punten met een tegenstander gedicht. Dat was zelfs tweemaal door **Standard** in 2011. De kloof van 8 punten met **Anderlecht** werd gedicht. De kloof van 7 punten dichten met **Racing Genk** was zelf nét niet genoeg om kampioen te spelen. Dankzij de afrondingsregels ging Genk, ondanks het verschil in doelsaldo, met de eindoverwinning aan de haal.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE,cache=FALSE}
+n <- with(f,glm(Success~Start,family=binomial(link='logit')))
+final <- exp(1)^(predict(n,rankings))/(1+exp(1)^(predict(n,rankings)))
+finalUpr <- exp(1)^(predict(n,rankings)+1.96*(predict(n,rankings,type="link",se.fit=TRUE)$se.fit))/(1+exp(1)^(predict(n,rankings)+1.96*(predict(n,rankings,type="link",se.fit=TRUE)$se.fit)))
+finalLwr <- exp(1)^(predict(n,rankings)-1.96*(predict(n,rankings,type="link",se.fit=TRUE)$se.fit))/(1+exp(1)^(predict(n,rankings)-1.96*(predict(n,rankings,type="link",se.fit=TRUE)$se.fit)))
+```
+
+Met een [logistische regressie](https://nl.wikipedia.org/wiki/Logistische_regressie) (zie ook de grafiek hierboven) kunnen we bepalen wat de kansen zijn voor een team dat om 6 punten op een ander team bij te benen. Voor **Gent**, **Charleroi** en **KV Oostende** die elk 6 punten achter staan schatten we die _individuele_ kans in op slechts `r round(final[7],4)*100`%.[^3][^4]
+
+Schaffen we de playoffs dan maar beter af? Integendeel. Zoveel andere factoren dan de achterstand op de tegenstander bepalen hoe goed een team het zal doen; de individuele vorm van de spelers, rode kaarten, penalties, blunders, blessures, enzovoort. Voetbalmirakels gebeuren. Regelmatig zelf. Barcelona haalt een 4-0 achterstand op tegen PSG. Gent knikkert Tottenham uit de Europa League. IJsland in de kwartfinale van Euro 2016. En startend vanop de zesde plaats won Standard *bijna* de playoffs in 2011. Maar we mogen niet blind zijn voor de realiteit. De individuele kans voor **Gent**, **KVO** of **Charleroi** om de kloof met Anderlecht te dichten is al bij al zeer klein.
+
+[^1]: Indien de punten behaald in de reguliere competitie niet deelbaar zijn door twee, worden de gehalveerde punten naar boven afgerond. Bij gelijke stand na de play-offs worden bij ploegen die op dergelijke manier een half punt extra gekregen hebben, deze halve punten weer van het totaal afgetrokken. (Bron: [Wikipedia](https://nl.wikipedia.org/wiki/Eerste_klasse_2010-11_(voetbal_België)))
+[^2]: Alle puntenverschillen tussen alle zes team bij de start van elke playoffs werden opgelijst. Voor elke playoffs krijg je (5+4+3+2+1) puntenverschillen of kloven. Op 7 playoffs zijn er dus 105 kloven. Als we de puntenverschillen van 0 punten er vantussen laten komen we uit op 101 puntenverschillen of kloven.
+[^3]: Met een betrouwbaarheidsinterval van `r round(finalLwr[7],4)*100`% tot `r round(finalUpr[7],4)*100`%.
+[^4]: We kunnen niet inschatten wat de gezamenlijke kans is dat één van de drie ploegen de kloof dicht. Toch niet op basis van deze gegevens. De kans dat **Gent** de kloof met **Anderlecht** dicht hangt onder andere af van de matchen die het speelt tegen **Charleroi** en **KV Oostende**. Er treedt dus een wisselwerking tussen de kansen van de drie ploegen op. Die gebeurtenissen zijn dus [niet onafhankelijk](https://nl.wikipedia.org/wiki/Onafhankelijkheid_(kansrekening)) van elkaar.
